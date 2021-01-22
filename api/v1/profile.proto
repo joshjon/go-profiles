@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package profile.v1;
+
+import "gogoproto/gogo.proto";
+
+// Instructs compiler to generate methods to marshal, unmarshal, and
+// get the size of unmarshalled messages.
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+
+service Log {
+  rpc CreateProfile(CreateProfileReq) returns (CreateProfileRes) {}
+  rpc ReadProfile(ReadProfileReq) returns (ReadProfileRes) {}
+  rpc UpdateProfile(UpdateProfileReq) returns (UpdateProfileRes) {}
+  rpc DeleteProfile(DeleteProfileReq) returns (DeleteProfileRes) {}
+  rpc ListProfiles(ListProfilesReq) returns (ListProfilesRes) {}
+}
+
+message CreateProfileReq  {
+  Profile profile = 1;
+}
+
+message CreateProfileRes  {
+  Profile profile = 1;
+}
+
+message ReadProfileReq {
+  uint64 id = 1;
+}
+
+message ReadProfileRes {
+  Profile profile = 1;
+}
+
+message UpdateProfileReq {
+  Profile profile = 1;
+}
+
+message UpdateProfileRes {
+  Profile profile = 1;
+}
+
+message DeleteProfileReq {
+  uint64 id = 1;
+}
+
+message DeleteProfileRes {
+  bool success = 1;
+}
+
+message ListProfilesReq {}
+
+message ListProfilesRes {
+  Profile profile = 1;
+}
+
+message Profile {
+  uint64 id = 1;
+  string first_name = 2;
+  string last_name = 3;
+}
