@@ -10,7 +10,7 @@ option (gogoproto.marshaler_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.sizer_all) = true;
 
-service Log {
+service ProfileService {
   rpc CreateProfile(CreateProfileReq) returns (CreateProfileRes) {}
   rpc ReadProfile(ReadProfileReq) returns (ReadProfileRes) {}
   rpc UpdateProfile(UpdateProfileReq) returns (UpdateProfileRes) {}
@@ -50,6 +50,7 @@ message DeleteProfileRes {
   bool success = 1;
 }
 
+// Lists all profiles in database
 message ListProfilesReq {}
 
 message ListProfilesRes {
