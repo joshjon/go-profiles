@@ -2,9 +2,8 @@ package server
 
 import (
 	"context"
-	"strings"
-	"time"
-
+	grpcMiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpcAuth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	api "github.com/joshjon/go-profiles/api/v1"
 
 	"google.golang.org/grpc"
@@ -21,26 +20,29 @@ import (
 var _ api.ProfileServiceServer = (*grpcServer)(nil)
 
 type Config struct {
-	CommitLog  CommitProfile
-	Authorizer Authorizer
+	//CommitProfile CommitProfile
+	Authorizer    Authorizer
 }
 
 const (
 	objectWildcard = "*"
-	produceAction  = "produce"
-	consumeAction  = "consume"
+	createAction   = "create"
+	readAction     = "read"
+	updateAction   = "update"
+	deleteAction   = "delete"
 )
 
 type grpcServer struct {
 	*Config
-	Authorizer Authorizer
+	//mu         *sync.RWMutex
+	profiles   []*api.Profile
 }
 
 // Provides users a way to instantiate the service, create a
 // gRPC server, and register the service to that server.
 // This will give the user a server that just needs a listener
 // for it to accept incoming connections.
-func newgrpcServer(config *Config) (*grpcServer) {
+func newgrpcServer(config *Config) *grpcServer {
 	srv := &grpcServer{
 		Config: config,
 	}
@@ -48,112 +50,86 @@ func newgrpcServer(config *Config) (*grpcServer) {
 }
 
 func NewGRPCServer(config *Config, grpcOpts ...grpc.ServerOption) *grpc.Server {
+	grpcOpts = append(grpcOpts, grpc.StreamInterceptor(
+		grpcMiddleware.ChainStreamServer(
+			grpcAuth.StreamServerInterceptor(authenticate),
+		)), grpc.UnaryInterceptor(grpcMiddleware.ChainUnaryServer(
+		grpcAuth.UnaryServerInterceptor(authenticate),
+	)))
 	gsrv := grpc.NewServer(grpcOpts...)
 	srv := newgrpcServer(config)
 	api.RegisterProfileServiceServer(gsrv, srv)
 	return gsrv
 }
 
-func (s *grpcServer) Produce(ctx context.Context, req *api.ProduceRequest) (*api.ProduceResponse, error) {
-	if err := s.Authorizer.Authorize(
-		subject(ctx),
-		objectWildcard,
-		produceAction,
-	); err != nil {
+func (server *grpcServer) CreateProfile(ctx context.Context, req *api.CreateProfileReq) (*api.CreateProfileRes, error) {
+	if err := server.Authorizer.Authorize(subject(ctx), objectWildcard, createAction); err != nil {
 		return nil, err
 	}
 
-	offset, err := s.CommitLog.Create(req.Record)
+	//server.mu.Lock()
+	//defer server.mu.Unlock()
 
-	if err != nil {
+	// Check profile ID doesn't already exist
+	for _, profile := range server.profiles {
+		if profile.GetId() == req.Profile.GetId() {
+			return nil, status.Error(codes.FailedPrecondition, "user already exists")
+		}
+	}
+
+	server.profiles = append(server.profiles, req.Profile)
+	return &api.CreateProfileRes{Profile: req.Profile}, nil
+}
+
+func (server *grpcServer) ReadProfile(ctx context.Context, req *api.ReadProfileReq) (*api.ReadProfileRes, error) {
+	if err := server.Authorizer.Authorize(subject(ctx), objectWildcard, readAction); err != nil {
 		return nil, err
 	}
 
-	return &api.ProduceResponse{Offset: offset}, nil
+	//server.mu.Lock()
+	//defer server.mu.Unlock()
+
+	// Check profile ID doesn't already exist
+	for _, profile := range server.profiles {
+		if profile.GetId() == req.GetId() {
+			return &api.ReadProfileRes{Profile: profile}, nil
+		}
+	}
+
+	return nil, status.Error(codes.NotFound, "profile not found")
 }
 
-func (s *grpcServer) Consume(ctx context.Context, req *api.ConsumeRequest) (
-	*api.ConsumeResponse, error) {
-
-	if err := s.Authorizer.Authorize(
-		subject(ctx),
-		objectWildcard,
-		consumeAction,
-	); err != nil {
+func (server *grpcServer) UpdateProfile(ctx context.Context, req *api.UpdateProfileReq) (*api.UpdateProfileRes, error) {
+	if err := server.Authorizer.Authorize(subject(ctx), objectWildcard, updateAction); err != nil {
 		return nil, err
 	}
+	panic("implement me")
+}
 
-	record, err := s.CommitLog.Read(req.Offset)
-
-	if err != nil {
+func (server *grpcServer) DeleteProfile(ctx context.Context, req *api.DeleteProfileReq) (*api.DeleteProfileRes, error) {
+	if err := server.Authorizer.Authorize(subject(ctx), objectWildcard, deleteAction); err != nil {
 		return nil, err
 	}
-
-	return &api.ConsumeResponse{Record: record}, nil
+	panic("implement me")
 }
 
-// Bidirectional streaming RPC so the client can stream data into
-// the server’s log and the server can tell the client whether each
-// request succeeded.
-func (s *grpcServer) ProduceStream(stream api.Log_ProduceStreamServer) error {
-	for {
-		req, err := stream.Recv()
-
-		if err != nil {
-			return err
-		}
-
-		res, err := s.Produce(stream.Context(), req)
-
-		if err != nil {
-			return err
-		}
-
-		if err = stream.Send(res); err != nil {
-			return err
-		}
-	}
+func (server *grpcServer) ListProfiles(ctx context.Context, req *api.ListProfilesReq) (*api.ListProfilesRes, error) {
+	panic("implement me")
 }
 
-// Implements a server-side streaming RPC so the client can tell the
-// server where in the log to read records, and then the server will
-// stream every record that follows (even records that aren’t in the
-// log yet).
-// When the server reaches the end of the log, the server will wait
-// until someone appends a record to the log and then continue streaming
-// records to the client.
-func (s *grpcServer) ConsumeStream(
-	req *api.ConsumeRequest,
-	stream api.Log_ConsumeStreamServer,
-) error {
-	for {
-		select {
-		case <-stream.Context().Done():
-			return nil
-		default:
-			res, err := s.Consume(stream.Context(), req)
-			switch err.(type) {
-			case nil:
-			default:
-				return err
-			}
-			if err = stream.Send(res); err != nil {
-				return err
-			}
-			req.Offset++
-		}
-	}
-}
 
-// Server interfaces
+// Interfaces
 
-type CommitProfile interface {
-	Create(*api.Profile) (*api.Profile, error)
-	Read(uint64) (*api.Profile, error)
-	Update(*api.Profile) (*api.Profile, error)
-	Delete(uint64) (bool, error)
-	List() (*api.Profile, error)
-}
+// Only need CommitProfile interface if following same pattern
+// as the book e.g. profile passed to server -> log -> segment -> store
+
+//type CommitProfile interface {
+//	Create(*api.Profile) (*api.Profile, error)
+//	Read(uint64) (*api.Profile, error)
+//	Update(*api.Profile) (*api.Profile, error)
+//	Delete(uint64) (bool, error)
+//	List() (*api.Profile, error)
+//}
 
 type Authorizer interface {
 	Authorize(subject, object, action string) error
@@ -161,6 +137,8 @@ type Authorizer interface {
 
 // Authentication
 
+// Interceptor that reads the subject out of the client’s cert and
+// writes it to the RPC’s context.
 func authenticate(ctx context.Context) (context.Context, error) {
 	peer, ok := peer.FromContext(ctx)
 
@@ -178,6 +156,8 @@ func authenticate(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
+// Returns the client’s cert’s subject so we can identify a client
+// and check their access.
 func subject(ctx context.Context) string {
 	return ctx.Value(subjectContextKey{}).(string)
 }
