@@ -26,10 +26,10 @@ func TestServer(t *testing.T) {
 		config *Config,
 	){
 		// ...
-		//"create/read a profile succeeds": testCreateReadProfile,
+		"create/read a profile succeeds": testCreateReadProfile,
 		//"produce/consume stream succeeds":                     testProduceConsumeStream,
-		//"consume past log boundary fails":                     testConsumePastBoundary,
-		"unauthorized fails": testUnauthorized,
+		"consume past log boundary fails": testProfileNotFound,
+		"unauthorized fails":              testUnauthorized,
 	} {
 		t.Run(scenario, func(t *testing.T) {
 			rootClient,
@@ -42,12 +42,8 @@ func TestServer(t *testing.T) {
 	}
 }
 
-func setupTest(t *testing.T, fn func(*Config)) (
-	rootClient api.ProfileServiceClient,
-	nobodyClient api.ProfileServiceClient,
-	cfg *Config,
-	teardown func(),
-) {
+func setupTest(t *testing.T, fn func(*Config)) (rootClient api.ProfileServiceClient,
+	nobodyClient api.ProfileServiceClient, cfg *Config, teardown func()) {
 	t.Helper()
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -130,208 +126,40 @@ func setupTest(t *testing.T, fn func(*Config)) (
 	}
 }
 
-// Tests that producing and consuming works by using our client and
-// server to produce a record to the log, consume it back, and then
-// check that the record we sent is the same one we got back.
 func testCreateReadProfile(t *testing.T, client, _ api.ProfileServiceClient, config *Config) {
 	ctx := context.Background()
+	profile := &api.Profile{Id: rand.Uint64(), FirstName: "Foo", LastName: "Bar"}
 
-	want := &api.Profile{
-		Id:        rand.Uint64(),
-		FirstName: "Foo",
-		LastName:  "Bar",
-	}
-
-	createProfile, err := client.CreateProfile(
-		ctx,
-		&api.CreateProfileReq{
-			Profile: want,
-		},
-	)
+	createResponse, err := client.CreateProfile(ctx, &api.CreateProfileReq{Profile: profile})
 	require.NoError(t, err)
+	require.Equal(t, profile, createResponse.Profile)
 
-	readProfile, err := client.ReadProfile(ctx, &api.ReadProfileReq{
-		Id: createProfile.Profile.Id,
-	})
+	readResponse, err := client.ReadProfile(ctx, &api.ReadProfileReq{Id: profile.Id})
 	require.NoError(t, err)
-	require.Equal(t, want, readProfile.Profile)
+	require.Equal(t, profile, readResponse.Profile)
 }
 
-// TODO: use this to test profile id not found
-
-//// Tests that our server responds with an api.ErrOffsetOutOfRange
-//// error when a client tries to consume beyond the log’s boundaries.
-//func testConsumePastBoundary(
-//	t *testing.T,
-//	client, _ api.LogClient,
-//	config *Config,
-//) {
-//	ctx := context.Background()
-//
-//	produce, err := client.Produce(ctx, &api.ProduceRequest{
-//		Record: &api.Record{
-//			Value: []byte("hello world"),
-//		},
-//	})
-//	require.NoError(t, err)
-//
-//	consume, err := client.Consume(ctx, &api.ConsumeRequest{
-//		Offset: produce.Offset + 1,
-//	})
-//	if consume != nil {
-//		t.Fatal("consume not nil")
-//	}
-//	got := grpc.Code(err)
-//	want := grpc.Code(api.ErrOffsetOutOfRange{}.GRPCStatus().Err())
-//	if got != want {
-//		t.Fatalf("got err: %v, want: %v", got, want)
-//	}
-//}
-
-func testUnauthorized(
-	t *testing.T,
-	_,
-	client api.ProfileServiceClient,
-	config *Config,
-) {
-	profile := &api.Profile{
-		Id:        rand.Uint64(),
-		FirstName: "Foo",
-		LastName:  "Bar",
-	}
-
+func testProfileNotFound(t *testing.T, client, _ api.ProfileServiceClient, config *Config) {
 	ctx := context.Background()
-	createProfile, err := client.CreateProfile(ctx,
-		&api.CreateProfileReq{Profile: profile},
-	)
-	if createProfile != nil {
-		t.Fatalf("createProfile response should be nil")
-	}
-	gotCode, wantCode := status.Code(err), codes.PermissionDenied
-	if gotCode != wantCode {
-		t.Fatalf("got code: %d, want: %d", gotCode, wantCode)
-	}
-	readProfile, err := client.ReadProfile(ctx, &api.ReadProfileReq{
-		Id: profile.Id,
-	})
-	if readProfile != nil {
-		t.Fatalf("readProfile response should be nil")
-	}
-	gotCode, wantCode = status.Code(err), codes.PermissionDenied
-	if gotCode != wantCode {
-		t.Fatalf("got code: %d, want: %d", gotCode, wantCode)
-	}
+	profile := &api.Profile{Id: rand.Uint64(), FirstName: "Foo", LastName: "Bar"}
+
+	response, err := client.ReadProfile(ctx, &api.ReadProfileReq{Id: profile.Id})
+	require.Nil(t, response)
+	code, expected := status.Code(err), status.Code(api.ErrProfileNotFound{}.GRPCStatus().Err())
+	require.Equal(t, code, expected)
 }
 
-func setupTest1(t *testing.T, fn func(*Config)) (
-	client api.ProfileServiceClient,
-	cfg *Config,
-	teardown func(),
-) {
-	t.Helper()
+func testUnauthorized(t *testing.T, _, client api.ProfileServiceClient, config *Config) {
+	ctx := context.Background()
+	profile := &api.Profile{Id: rand.Uint64(), FirstName: "Foo", LastName: "Bar"}
 
-	t.Helper()
+	createResponse, err := client.CreateProfile(ctx, &api.CreateProfileReq{Profile: profile})
+	require.Nil(t, createResponse)
+	code, expectedCode := status.Code(err), codes.PermissionDenied
+	require.Equal(t, code, expectedCode)
 
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-
-	clientTLSConfig, err := config.SetupTLSConfig(config.TLSConfig{
-		CAFile: config.CAFile,
-	})
-	require.NoError(t, err)
-
-	clientCreds := credentials.NewTLS(clientTLSConfig)
-	cc, err := grpc.Dial(
-		l.Addr().String(),
-		grpc.WithTransportCredentials(clientCreds),
-	)
-	require.NoError(t, err)
-
-	client = api.NewProfileServiceClient(cc)
-
-	serverTLSConfig, err := config.SetupTLSConfig(config.TLSConfig{
-		CertFile:      config.ServerCertFile,
-		KeyFile:       config.ServerKeyFile,
-		CAFile:        config.CAFile,
-		ServerAddress: l.Addr().String(),
-	})
-	require.NoError(t, err)
-	serverCreds := credentials.NewTLS(serverTLSConfig)
-
-	require.NoError(t, err)
-
-	require.NoError(t, err)
-
-	cfg = &Config{}
-	if fn != nil {
-		fn(cfg)
-	}
-	server := NewGRPCServer(cfg, grpc.Creds(serverCreds))
-	require.NoError(t, err)
-
-	go func() {
-		server.Serve(l)
-	}()
-
-	return client, cfg, func() {
-		server.Stop()
-		cc.Close()
-		l.Close()
-	}
-}
-
-func setupTest2(t *testing.T, fn func(*Config)) (
-	client api.ProfileServiceClient,
-	cfg *Config,
-	teardown func(),
-) {
-	t.Helper()
-
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-
-	clientTLSConfig, err := config.SetupTLSConfig(config.TLSConfig{
-		CAFile: config.CAFile,
-	})
-	require.NoError(t, err)
-
-	clientCreds := credentials.NewTLS(clientTLSConfig)
-	cc, err := grpc.Dial(
-		l.Addr().String(),
-		grpc.WithTransportCredentials(clientCreds),
-	)
-	require.NoError(t, err)
-
-	client = api.NewProfileServiceClient(cc)
-
-	serverTLSConfig, err := config.SetupTLSConfig(config.TLSConfig{
-		CertFile:      config.ServerCertFile,
-		KeyFile:       config.ServerKeyFile,
-		CAFile:        config.CAFile,
-		ServerAddress: l.Addr().String(),
-		Server:        true,
-	})
-	require.NoError(t, err)
-	serverCreds := credentials.NewTLS(serverTLSConfig)
-
-	require.NoError(t, err)
-
-	require.NoError(t, err)
-
-	cfg = &Config{}
-	if fn != nil {
-		fn(cfg)
-	}
-	server := NewGRPCServer(cfg, grpc.Creds(serverCreds))
-	require.NoError(t, err)
-
-	go func() {
-		server.Serve(l)
-	}()
-
-	return client, cfg, func() {
-		server.Stop()
-		cc.Close()
-		l.Close()
-	}
+	readResponse, err := client.ReadProfile(ctx, &api.ReadProfileReq{Id: profile.Id})
+	require.Nil(t, readResponse)
+	code, expectedCode = status.Code(err), codes.PermissionDenied
+	require.Equal(t, code, expectedCode)
 }

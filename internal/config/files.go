@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 )
 
+// Paths to generated certs for tests
+
 var (
 	CAFile               = configFile("ca.pem")
 	ServerCertFile       = configFile("server.pem")

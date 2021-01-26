@@ -89,14 +89,13 @@ func (server *grpcServer) ReadProfile(ctx context.Context, req *api.ReadProfileR
 	//server.mu.Lock()
 	//defer server.mu.Unlock()
 
-	// Check profile ID doesn't already exist
 	for _, profile := range server.profiles {
 		if profile.GetId() == req.GetId() {
 			return &api.ReadProfileRes{Profile: profile}, nil
 		}
 	}
 
-	return nil, status.Error(codes.NotFound, "profile not found")
+	return nil, api.ErrProfileNotFound{Id: req.GetId()}
 }
 
 func (server *grpcServer) UpdateProfile(ctx context.Context, req *api.UpdateProfileReq) (*api.UpdateProfileRes, error) {
