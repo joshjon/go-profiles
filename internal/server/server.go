@@ -5,6 +5,7 @@ import (
 	grpcMiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpcAuth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	api "github.com/joshjon/go-profiles/api/v1"
+	"sync"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -21,7 +22,7 @@ var _ api.ProfileServiceServer = (*grpcServer)(nil)
 
 type Config struct {
 	//CommitProfile CommitProfile
-	Authorizer    Authorizer
+	Authorizer Authorizer
 }
 
 const (
@@ -34,8 +35,8 @@ const (
 
 type grpcServer struct {
 	*Config
-	//mu         *sync.RWMutex
-	profiles   []*api.Profile
+	mu       *sync.RWMutex
+	profiles []*api.Profile
 }
 
 // Provides users a way to instantiate the service, create a
@@ -43,10 +44,10 @@ type grpcServer struct {
 // This will give the user a server that just needs a listener
 // for it to accept incoming connections.
 func newgrpcServer(config *Config) *grpcServer {
-	srv := &grpcServer{
+	return &grpcServer{
 		Config: config,
+		mu:     &sync.RWMutex{},
 	}
-	return srv
 }
 
 func NewGRPCServer(config *Config, grpcOpts ...grpc.ServerOption) *grpc.Server {
@@ -67,13 +68,12 @@ func (server *grpcServer) CreateProfile(ctx context.Context, req *api.CreateProf
 		return nil, err
 	}
 
-	//server.mu.Lock()
-	//defer server.mu.Unlock()
+	server.mu.Lock()
+	defer server.mu.Unlock()
 
-	// Check profile ID doesn't already exist
 	for _, profile := range server.profiles {
 		if profile.GetId() == req.Profile.GetId() {
-			return nil, status.Error(codes.FailedPrecondition, "user already exists")
+			return nil, status.Error(codes.FailedPrecondition, "profile already exists")
 		}
 	}
 
@@ -86,8 +86,8 @@ func (server *grpcServer) ReadProfile(ctx context.Context, req *api.ReadProfileR
 		return nil, err
 	}
 
-	//server.mu.Lock()
-	//defer server.mu.Unlock()
+	server.mu.Lock()
+	defer server.mu.Unlock()
 
 	for _, profile := range server.profiles {
 		if profile.GetId() == req.GetId() {
@@ -114,8 +114,17 @@ func (server *grpcServer) DeleteProfile(ctx context.Context, req *api.DeleteProf
 
 func (server *grpcServer) ListProfiles(ctx context.Context, req *api.ListProfilesReq) (*api.ListProfilesRes, error) {
 	panic("implement me")
+	//if err := server.Authorizer.Authorize(subject(ctx), objectWildcard, readAction); err != nil {
+	//	return nil, err
+	//}
+	//
+	//server.mu.Lock()
+	//defer server.mu.Unlock()
+	//
+	//if len(server.profiles) == 0 {
+	//
+	//}
 }
-
 
 // Interfaces
 

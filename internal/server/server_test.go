@@ -25,7 +25,6 @@ func TestServer(t *testing.T) {
 		nobodyClient api.ProfileServiceClient,
 		config *Config,
 	){
-		// ...
 		"create/read a profile succeeds": testCreateReadProfile,
 		//"produce/consume stream succeeds":                     testProduceConsumeStream,
 		"consume past log boundary fails": testProfileNotFound,
@@ -141,24 +140,22 @@ func testCreateReadProfile(t *testing.T, client, _ api.ProfileServiceClient, con
 
 func testProfileNotFound(t *testing.T, client, _ api.ProfileServiceClient, config *Config) {
 	ctx := context.Background()
-	profile := &api.Profile{Id: rand.Uint64(), FirstName: "Foo", LastName: "Bar"}
-
-	response, err := client.ReadProfile(ctx, &api.ReadProfileReq{Id: profile.Id})
+	response, err := client.ReadProfile(ctx, &api.ReadProfileReq{Id: rand.Uint64()})
 	require.Nil(t, response)
 	code, expected := status.Code(err), status.Code(api.ErrProfileNotFound{}.GRPCStatus().Err())
 	require.Equal(t, code, expected)
 }
 
-func testUnauthorized(t *testing.T, _, client api.ProfileServiceClient, config *Config) {
+func testUnauthorized(t *testing.T, _, nobodyClient api.ProfileServiceClient, config *Config) {
 	ctx := context.Background()
 	profile := &api.Profile{Id: rand.Uint64(), FirstName: "Foo", LastName: "Bar"}
 
-	createResponse, err := client.CreateProfile(ctx, &api.CreateProfileReq{Profile: profile})
+	createResponse, err := nobodyClient.CreateProfile(ctx, &api.CreateProfileReq{Profile: profile})
 	require.Nil(t, createResponse)
 	code, expectedCode := status.Code(err), codes.PermissionDenied
 	require.Equal(t, code, expectedCode)
 
-	readResponse, err := client.ReadProfile(ctx, &api.ReadProfileReq{Id: profile.Id})
+	readResponse, err := nobodyClient.ReadProfile(ctx, &api.ReadProfileReq{Id: profile.Id})
 	require.Nil(t, readResponse)
 	code, expectedCode = status.Code(err), codes.PermissionDenied
 	require.Equal(t, code, expectedCode)
