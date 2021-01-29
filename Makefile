@@ -55,8 +55,10 @@ test: $(CONFIG_PATH)/policy.csv $(CONFIG_PATH)/model.conf
 compile:
 	protoc api/v1/*.proto \
 		--gogo_out=Mgogoproto/gogo.proto=github.com/gogo/protobuf/proto,plugins=grpc:. \
+		--proto_path=${GOPATH}/src \
 		--proto_path=$$(go list -f '{{ .Dir }}' -m github.com/gogo/protobuf) \
-		--proto_path=.
+		--proto_path=. \
+		--govalidators_out=gogoimport=true:.
 
 TAG ?= 0.0.1
 

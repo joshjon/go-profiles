@@ -6,7 +6,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"io/ioutil"
-	"math/rand"
 	"net"
 	"os"
 	"testing"
@@ -127,20 +126,22 @@ func setupTest(t *testing.T, fn func(*Config)) (rootClient api.ProfileServiceCli
 
 func testCreateReadProfile(t *testing.T, client, _ api.ProfileServiceClient, config *Config) {
 	ctx := context.Background()
-	profile := &api.Profile{Id: rand.Uint64(), FirstName: "Foo", LastName: "Bar"}
+	payload := &api.CreateProfileReq{FirstName: "Foo", LastName: "Bar"}
 
-	createResponse, err := client.CreateProfile(ctx, &api.CreateProfileReq{Profile: profile})
+	createResponse, err := client.CreateProfile(ctx, payload)
 	require.NoError(t, err)
-	require.Equal(t, profile, createResponse.Profile)
+	require.NotEmpty(t, createResponse.Id)
 
-	readResponse, err := client.ReadProfile(ctx, &api.ReadProfileReq{Id: profile.Id})
+	id := createResponse.Id
+
+	readResponse, err := client.ReadProfile(ctx, &api.ReadProfileReq{Id: id})
 	require.NoError(t, err)
-	require.Equal(t, profile, readResponse.Profile)
+	require.Equal(t, id, readResponse.Id)
 }
 
 func testProfileNotFound(t *testing.T, client, _ api.ProfileServiceClient, config *Config) {
 	ctx := context.Background()
-	response, err := client.ReadProfile(ctx, &api.ReadProfileReq{Id: rand.Uint64()})
+	response, err := client.ReadProfile(ctx, &api.ReadProfileReq{Id: "Foo"})
 	require.Nil(t, response)
 	code, expected := status.Code(err), status.Code(api.ErrProfileNotFound{}.GRPCStatus().Err())
 	require.Equal(t, code, expected)
@@ -148,14 +149,14 @@ func testProfileNotFound(t *testing.T, client, _ api.ProfileServiceClient, confi
 
 func testUnauthorized(t *testing.T, _, nobodyClient api.ProfileServiceClient, config *Config) {
 	ctx := context.Background()
-	profile := &api.Profile{Id: rand.Uint64(), FirstName: "Foo", LastName: "Bar"}
+	payload :=  &api.CreateProfileReq{FirstName: "Foo", LastName: "Bar"}
 
-	createResponse, err := nobodyClient.CreateProfile(ctx, &api.CreateProfileReq{Profile: profile})
+	createResponse, err := nobodyClient.CreateProfile(ctx, payload)
 	require.Nil(t, createResponse)
 	code, expectedCode := status.Code(err), codes.PermissionDenied
 	require.Equal(t, code, expectedCode)
 
-	readResponse, err := nobodyClient.ReadProfile(ctx, &api.ReadProfileReq{Id: profile.Id})
+	readResponse, err := nobodyClient.ReadProfile(ctx, &api.ReadProfileReq{Id: "foo"})
 	require.Nil(t, readResponse)
 	code, expectedCode = status.Code(err), codes.PermissionDenied
 	require.Equal(t, code, expectedCode)

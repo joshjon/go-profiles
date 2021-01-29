@@ -9,18 +9,18 @@ import (
 )
 
 type ErrProfileNotFound struct {
-	Id uint64
+	Id string
 }
 
 func (error ErrProfileNotFound) GRPCStatus() *status.Status {
-	errStatus := status.New(codes.NotFound, fmt.Sprintf("profile not found: %d", error.Id))
-	errMsg := fmt.Sprintf("The requested profile does not exist: %d", error.Id)
+	errStatus := status.New(codes.NotFound, fmt.Sprintf("%s not found", error.Id))
+	errMsg := fmt.Sprintf("The requested profile does not exist: %s", error.Id)
 	errDetails := &errdetails.LocalizedMessage{Locale: "en-US", Message: errMsg}
-	std, err := errStatus.WithDetails(errDetails)
+	errStatusDetails, err := errStatus.WithDetails(errDetails)
 	if err != nil {
 		return errStatus
 	}
-	return std
+	return errStatusDetails
 }
 
 func (error ErrProfileNotFound) Error() string {

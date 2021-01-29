@@ -5,8 +5,11 @@ import (
 	grpcMiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpcAuth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	api "github.com/joshjon/go-profiles/api/v1"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"sync"
+	"time"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -63,7 +66,7 @@ func NewGRPCServer(config *Config, grpcOpts ...grpc.ServerOption) *grpc.Server {
 	return gsrv
 }
 
-func (server *grpcServer) CreateProfile(ctx context.Context, req *api.CreateProfileReq) (*api.CreateProfileRes, error) {
+func (server *grpcServer) CreateProfile(ctx context.Context, req *api.CreateProfileReq) (*api.Profile, error) {
 	if err := server.Authorizer.Authorize(subject(ctx), objectWildcard, createAction); err != nil {
 		return nil, err
 	}
@@ -71,17 +74,31 @@ func (server *grpcServer) CreateProfile(ctx context.Context, req *api.CreateProf
 	server.mu.Lock()
 	defer server.mu.Unlock()
 
-	for _, profile := range server.profiles {
-		if profile.GetId() == req.Profile.GetId() {
-			return nil, status.Error(codes.FailedPrecondition, "profile already exists")
-		}
+	if err := req.Validate(); err != nil {
+		return nil, err
 	}
 
-	server.profiles = append(server.profiles, req.Profile)
-	return &api.CreateProfileRes{Profile: req.Profile}, nil
+	id, err := uuid.NewUUID()
+
+	if err != nil {
+		return nil, status.Error(codes.Internal, "unable to generate UUID")
+	}
+
+	now := time.Now()
+
+	profile := api.Profile{
+		Id:         id.String(),
+		FirstName:  req.FirstName,
+		LastName:   req.LastName,
+		CreateDate: &now,
+		UpdateDate: &now,
+	}
+
+	server.profiles = append(server.profiles, &profile)
+	return &profile, nil
 }
 
-func (server *grpcServer) ReadProfile(ctx context.Context, req *api.ReadProfileReq) (*api.ReadProfileRes, error) {
+func (server *grpcServer) ReadProfile(ctx context.Context, req *api.ReadProfileReq) (*api.Profile, error) {
 	if err := server.Authorizer.Authorize(subject(ctx), objectWildcard, readAction); err != nil {
 		return nil, err
 	}
@@ -91,39 +108,29 @@ func (server *grpcServer) ReadProfile(ctx context.Context, req *api.ReadProfileR
 
 	for _, profile := range server.profiles {
 		if profile.GetId() == req.GetId() {
-			return &api.ReadProfileRes{Profile: profile}, nil
+			return profile, nil
 		}
 	}
 
 	return nil, api.ErrProfileNotFound{Id: req.GetId()}
 }
 
-func (server *grpcServer) UpdateProfile(ctx context.Context, req *api.UpdateProfileReq) (*api.UpdateProfileRes, error) {
+func (server *grpcServer) UpdateProfile(ctx context.Context, req *api.CreateProfileReq) (*api.Profile, error) {
 	if err := server.Authorizer.Authorize(subject(ctx), objectWildcard, updateAction); err != nil {
 		return nil, err
 	}
 	panic("implement me")
 }
 
-func (server *grpcServer) DeleteProfile(ctx context.Context, req *api.DeleteProfileReq) (*api.DeleteProfileRes, error) {
+func (server *grpcServer) DeleteProfile(ctx context.Context, req *api.ReadProfileReq) (*api.DeleteProfileRes, error) {
 	if err := server.Authorizer.Authorize(subject(ctx), objectWildcard, deleteAction); err != nil {
 		return nil, err
 	}
 	panic("implement me")
 }
 
-func (server *grpcServer) ListProfiles(ctx context.Context, req *api.ListProfilesReq) (*api.ListProfilesRes, error) {
+func (server *grpcServer) ListProfiles(ctx context.Context, req *emptypb.Empty) (*api.ListProfilesRes, error) {
 	panic("implement me")
-	//if err := server.Authorizer.Authorize(subject(ctx), objectWildcard, readAction); err != nil {
-	//	return nil, err
-	//}
-	//
-	//server.mu.Lock()
-	//defer server.mu.Unlock()
-	//
-	//if len(server.profiles) == 0 {
-	//
-	//}
 }
 
 // Interfaces
