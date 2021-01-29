@@ -24,8 +24,7 @@ func TestServer(t *testing.T) {
 		nobodyClient api.ProfileServiceClient,
 		config *Config,
 	){
-		"create/read a profile succeeds": testCreateReadProfile,
-		//"produce/consume stream succeeds":                     testProduceConsumeStream,
+		"create/read a profile succeeds":  testCreateReadProfile,
 		"consume past log boundary fails": testProfileNotFound,
 		"unauthorized fails":              testUnauthorized,
 	} {
@@ -149,7 +148,7 @@ func testProfileNotFound(t *testing.T, client, _ api.ProfileServiceClient, confi
 
 func testUnauthorized(t *testing.T, _, nobodyClient api.ProfileServiceClient, config *Config) {
 	ctx := context.Background()
-	payload :=  &api.CreateProfileReq{FirstName: "Foo", LastName: "Bar"}
+	payload := &api.CreateProfileReq{FirstName: "Foo", LastName: "Bar"}
 
 	createResponse, err := nobodyClient.CreateProfile(ctx, payload)
 	require.Nil(t, createResponse)

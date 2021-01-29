@@ -4,6 +4,7 @@ import (
 	"context"
 	grpcMiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpcAuth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
+	grpcValidator "github.com/grpc-ecosystem/go-grpc-middleware/validator"
 	api "github.com/joshjon/go-profiles/api/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"sync"
@@ -18,13 +19,9 @@ import (
 )
 
 // Guarantees *grpcServer satisfies api.LogServer interface.
-// This is a trick to ensure all methods are implemented for
-// the interface or else the compiler will complain.
-// It acts like type-checked code documentation.
 var _ api.ProfileServiceServer = (*grpcServer)(nil)
 
 type Config struct {
-	//CommitProfile CommitProfile
 	Authorizer Authorizer
 }
 
@@ -42,10 +39,8 @@ type grpcServer struct {
 	profiles []*api.Profile
 }
 
-// Provides users a way to instantiate the service, create a
-// gRPC server, and register the service to that server.
-// This will give the user a server that just needs a listener
-// for it to accept incoming connections.
+// Provides users a way to instantiate the service, create a gRPC server, and register the service to that server.
+// This will give the user a server that just needs a listener for it to accept incoming connections.
 func newgrpcServer(config *Config) *grpcServer {
 	return &grpcServer{
 		Config: config,
@@ -54,11 +49,9 @@ func newgrpcServer(config *Config) *grpcServer {
 }
 
 func NewGRPCServer(config *Config, grpcOpts ...grpc.ServerOption) *grpc.Server {
-	grpcOpts = append(grpcOpts, grpc.StreamInterceptor(
-		grpcMiddleware.ChainStreamServer(
-			grpcAuth.StreamServerInterceptor(authenticate),
-		)), grpc.UnaryInterceptor(grpcMiddleware.ChainUnaryServer(
+	grpcOpts = append(grpcOpts, grpc.UnaryInterceptor(grpcMiddleware.ChainUnaryServer(
 		grpcAuth.UnaryServerInterceptor(authenticate),
+		grpcValidator.UnaryServerInterceptor(),
 	)))
 	gsrv := grpc.NewServer(grpcOpts...)
 	srv := newgrpcServer(config)
@@ -73,10 +66,6 @@ func (server *grpcServer) CreateProfile(ctx context.Context, req *api.CreateProf
 
 	server.mu.Lock()
 	defer server.mu.Unlock()
-
-	if err := req.Validate(); err != nil {
-		return nil, err
-	}
 
 	id, err := uuid.NewUUID()
 
@@ -133,27 +122,11 @@ func (server *grpcServer) ListProfiles(ctx context.Context, req *emptypb.Empty) 
 	panic("implement me")
 }
 
-// Interfaces
-
-// Only need CommitProfile interface if following same pattern
-// as the book e.g. profile passed to server -> log -> segment -> store
-
-//type CommitProfile interface {
-//	Create(*api.Profile) (*api.Profile, error)
-//	Read(uint64) (*api.Profile, error)
-//	Update(*api.Profile) (*api.Profile, error)
-//	Delete(uint64) (bool, error)
-//	List() (*api.Profile, error)
-//}
-
 type Authorizer interface {
 	Authorize(subject, object, action string) error
 }
 
-// Authentication
-
-// Interceptor that reads the subject out of the client’s cert and
-// writes it to the RPC’s context.
+// Interceptor that reads the subject out of the client’s cert and writes it to the RPC’s context.
 func authenticate(ctx context.Context) (context.Context, error) {
 	peer, ok := peer.FromContext(ctx)
 
@@ -171,8 +144,7 @@ func authenticate(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
-// Returns the client’s cert’s subject so we can identify a client
-// and check their access.
+// Returns the client’s cert’s subject so we can identify a client and check their access.
 func subject(ctx context.Context) string {
 	return ctx.Value(subjectContextKey{}).(string)
 }
