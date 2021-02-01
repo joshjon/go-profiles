@@ -18,13 +18,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// Guarantees *grpcServer satisfies api.LogServer interface.
-var _ api.ProfileServiceServer = (*grpcServer)(nil)
-
-type Config struct {
-	Authorizer Authorizer
-}
-
 const (
 	objectWildcard = "*"
 	createAction   = "create"
@@ -32,6 +25,13 @@ const (
 	updateAction   = "update"
 	deleteAction   = "delete"
 )
+
+// Guarantees *grpcServer satisfies api.LogServer interface.
+var _ api.ProfileServiceServer = (*grpcServer)(nil)
+
+type Config struct {
+	Authorizer Authorizer
+}
 
 type grpcServer struct {
 	*Config
@@ -48,6 +48,7 @@ func newgrpcServer(config *Config) *grpcServer {
 	}
 }
 
+// Constructor
 func NewGRPCServer(config *Config, grpcOpts ...grpc.ServerOption) *grpc.Server {
 	grpcOpts = append(grpcOpts, grpc.UnaryInterceptor(grpcMiddleware.ChainUnaryServer(
 		grpcAuth.UnaryServerInterceptor(authenticate),

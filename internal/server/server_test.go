@@ -18,16 +18,13 @@ import (
 )
 
 func TestServer(t *testing.T) {
-	for scenario, fn := range map[string]func(
-		t *testing.T,
-		rootClient api.ProfileServiceClient,
-		nobodyClient api.ProfileServiceClient,
-		config *Config,
-	){
+	tests := map[string]func(t *testing.T, rootClient api.ProfileServiceClient, nobodyClient api.ProfileServiceClient, config *Config){
 		"create/read a profile succeeds":  testCreateReadProfile,
 		"consume past log boundary fails": testProfileNotFound,
 		"unauthorized fails":              testUnauthorized,
-	} {
+	}
+
+	for scenario, fn := range tests {
 		t.Run(scenario, func(t *testing.T) {
 			rootClient,
 			nobodyClient,
