@@ -5,7 +5,6 @@ go 1.15
 require (
 	github.com/casbin/casbin v1.9.1
 	github.com/gogo/protobuf v1.3.2
-	github.com/golang/mock v1.4.4 // indirect
 	github.com/google/uuid v1.1.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.2.2
 	github.com/mwitkow/go-proto-validators v0.3.2

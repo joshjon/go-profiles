@@ -2,158 +2,86 @@ package server
 
 import (
 	"context"
+	api "github.com/joshjon/go-profiles/api/v1"
 	"github.com/joshjon/go-profiles/internal/config"
+	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"io/ioutil"
 	"net"
-	"os"
 	"testing"
-
-	api "github.com/joshjon/go-profiles/api/v1"
-	"github.com/joshjon/go-profiles/internal/auth"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 )
 
-func TestServer(t *testing.T) {
-	tests := map[string]func(t *testing.T, rootClient api.ProfileServiceClient, nobodyClient api.ProfileServiceClient, config *Config){
-		"create/read a profile succeeds":  testCreateReadProfile,
-		"consume past log boundary fails": testProfileNotFound,
-		"unauthorized fails":              testUnauthorized,
-	}
-
-	for scenario, fn := range tests {
-		t.Run(scenario, func(t *testing.T) {
-			rootClient,
-			nobodyClient,
-			config,
-			teardown := setupTest(t, nil)
-			defer teardown()
-			fn(t, rootClient, nobodyClient, config)
-		})
-	}
+func TestServerTestSuite(t *testing.T) {
+	suite.Run(t, new(ServerTestSuite))
 }
 
-func setupTest(t *testing.T, fn func(*Config)) (rootClient api.ProfileServiceClient,
-	nobodyClient api.ProfileServiceClient, cfg *Config, teardown func()) {
-	t.Helper()
+type ServerTestSuite struct {
+	suite.Suite
+	server       *grpc.Server
+	rootClient   *Client
+	nobodyClient *Client
+	listener     net.Listener
+}
 
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-
-	// Helper used to create new clients (see below)
-	newClient := func(crtPath, keyPath string) (
-		*grpc.ClientConn,
-		api.ProfileServiceClient,
-		[]grpc.DialOption,
-	) {
-		tlsConfig, err := config.SetupTLSConfig(config.TLSConfig{
-			CertFile: crtPath,
-			KeyFile:  keyPath,
-			CAFile:   config.CAFile,
-			Server:   false,
-		})
-		require.NoError(t, err)
-		tlsCreds := credentials.NewTLS(tlsConfig)
-		opts := []grpc.DialOption{grpc.WithTransportCredentials(tlsCreds)}
-		conn, err := grpc.Dial(l.Addr().String(), opts...)
-		require.NoError(t, err)
-		client := api.NewProfileServiceClient(conn)
-		return conn, client, opts
-	}
-
+func (suite *ServerTestSuite) SetupTest() {
+	listener, err := net.Listen("tcp", ServerAddress)
+	suite.NoError(err)
+	suite.listener = listener
 	// Superuser permitted to produce and consume
-	var rootConn *grpc.ClientConn
-	rootConn, rootClient, _ = newClient(
-		config.RootClientCertFile,
-		config.RootClientKeyFile,
-	)
-
+	suite.rootClient, err = NewProfileServiceClient(ServerAddress, config.RootClientCertFile, config.RootClientKeyFile, config.CAFile)
+	suite.NoError(err)
 	// Client who is not permitted to do anything
-	var nobodyConn *grpc.ClientConn
-	nobodyConn, nobodyClient, _ = newClient(
-		config.NobodyClientCertFile,
-		config.NobodyClientKeyFile,
-	)
-
-	// Parse the server's cert and key, which is used to configure the
-	// server's TLS credentials. Those are then passed as a gRPC server
-	// option to the NewGRPCServer function so it can create the gRPC
-	// server with that option.
-	serverTLSConfig, err := config.SetupTLSConfig(config.TLSConfig{
-		CertFile: config.ServerCertFile,
-		KeyFile:  config.ServerKeyFile,
-		CAFile:   config.CAFile,
-		Server:   true,
-	})
-	require.NoError(t, err)
-	serverCreds := credentials.NewTLS(serverTLSConfig)
-
-	dir, err := ioutil.TempDir("", "server-test")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	require.NoError(t, err)
-
-	authorizer := auth.New(config.ACLModelFile, config.ACLPolicyFile)
-
-	cfg = &Config{
-		Authorizer: authorizer,
-	}
-	if fn != nil {
-		fn(cfg)
-	}
-
-	server := NewGRPCServer(cfg, grpc.Creds(serverCreds))
-
-	go func() {
-		server.Serve(l)
-	}()
-
-	return rootClient, nobodyClient, cfg, func() {
-		server.Stop()
-		rootConn.Close()
-		nobodyConn.Close()
-		l.Close()
-	}
+	suite.nobodyClient, err = NewProfileServiceClient(ServerAddress, config.NobodyClientCertFile, config.NobodyClientKeyFile, config.CAFile)
+	suite.NoError(err)
+	suite.server, err = NewTestGRPCServer(config.ServerCertFile, config.ServerKeyFile, config.CAFile, config.ACLModelFile, config.ACLPolicyFile)
+	suite.NoError(err)
+	go suite.server.Serve(listener)
 }
 
-func testCreateReadProfile(t *testing.T, client, _ api.ProfileServiceClient, config *Config) {
+func (suite *ServerTestSuite) TearDownTest() {
+	suite.server.Stop()
+	suite.rootClient.Conn.Close()
+	suite.nobodyClient.Conn.Close()
+	suite.listener.Close()
+}
+
+func (suite *ServerTestSuite) TestCreateReadProfile() {
+	client := suite.rootClient.Client
 	ctx := context.Background()
 	payload := &api.CreateProfileReq{FirstName: "Foo", LastName: "Bar"}
 
 	createResponse, err := client.CreateProfile(ctx, payload)
-	require.NoError(t, err)
-	require.NotEmpty(t, createResponse.Id)
+	suite.NoError(err)
+	suite.NotEmpty(createResponse.Id)
 
 	id := createResponse.Id
-
 	readResponse, err := client.ReadProfile(ctx, &api.ReadProfileReq{Id: id})
-	require.NoError(t, err)
-	require.Equal(t, id, readResponse.Id)
+	suite.NoError(err)
+	suite.Equal(id, readResponse.Id)
 }
 
-func testProfileNotFound(t *testing.T, client, _ api.ProfileServiceClient, config *Config) {
+func (suite *ServerTestSuite) TestProfileNotFound() {
 	ctx := context.Background()
+	client := suite.rootClient.Client
 	response, err := client.ReadProfile(ctx, &api.ReadProfileReq{Id: "Foo"})
-	require.Nil(t, response)
+	suite.Nil(response)
 	code, expected := status.Code(err), status.Code(api.ErrProfileNotFound{}.GRPCStatus().Err())
-	require.Equal(t, code, expected)
+	suite.Equal(code, expected)
 }
 
-func testUnauthorized(t *testing.T, _, nobodyClient api.ProfileServiceClient, config *Config) {
+func (suite *ServerTestSuite) testUnauthorized() {
+	client := suite.nobodyClient.Client
 	ctx := context.Background()
 	payload := &api.CreateProfileReq{FirstName: "Foo", LastName: "Bar"}
 
-	createResponse, err := nobodyClient.CreateProfile(ctx, payload)
-	require.Nil(t, createResponse)
+	createResponse, err := client.CreateProfile(ctx, payload)
+	suite.Nil(createResponse)
 	code, expectedCode := status.Code(err), codes.PermissionDenied
-	require.Equal(t, code, expectedCode)
+	suite.Equal(code, expectedCode)
 
-	readResponse, err := nobodyClient.ReadProfile(ctx, &api.ReadProfileReq{Id: "foo"})
-	require.Nil(t, readResponse)
+	readResponse, err := client.ReadProfile(ctx, &api.ReadProfileReq{Id: "foo"})
+	suite.Nil(readResponse)
 	code, expectedCode = status.Code(err), codes.PermissionDenied
-	require.Equal(t, code, expectedCode)
+	suite.Equal(code, expectedCode)
 }

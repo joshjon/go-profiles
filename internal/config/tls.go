@@ -45,7 +45,6 @@ func SetupTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-
 type TLSConfig struct {
 	CertFile      string
 	KeyFile       string
@@ -53,4 +52,3 @@ type TLSConfig struct {
 	ServerAddress string
 	Server        bool
 }
-
