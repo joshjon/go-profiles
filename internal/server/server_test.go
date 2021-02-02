@@ -70,7 +70,7 @@ func (suite *ServerTestSuite) TestProfileNotFound() {
 	suite.Equal(code, expected)
 }
 
-func (suite *ServerTestSuite) testUnauthorized() {
+func (suite *ServerTestSuite) TestUnauthorized() {
 	client := suite.nobodyClient.Client
 	ctx := context.Background()
 	payload := &api.CreateProfileReq{FirstName: "Foo", LastName: "Bar"}
