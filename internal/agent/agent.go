@@ -14,12 +14,10 @@ import (
 
 type Config struct {
 	ServerTLSConfig *tls.Config
-	//PeerTLSConfig   *tls.Config
-	RPCPort int
-	// server id
-	NodeName      string
-	ACLModelFile  string
-	ACLPolicyFile string
+	RPCPort         int
+	NodeName        string
+	ACLModelFile    string
+	ACLPolicyFile   string
 }
 
 type Agent struct {
@@ -30,14 +28,12 @@ type Agent struct {
 	shutdownLock sync.Mutex
 }
 
-func (c Config) RPCAddr() (string, error) {
-	return fmt.Sprintf("%s:%d", "localhost", c.RPCPort), nil
+func (c Config) RPCAddr() string {
+	return fmt.Sprintf("%s:%d", "localhost", c.RPCPort)
 }
 
 func New(config Config) (*Agent, error) {
-	agent := &Agent{
-		Config:    config,
-	}
+	agent := &Agent{Config: config}
 
 	setup := []func() error{
 		agent.setupMux,

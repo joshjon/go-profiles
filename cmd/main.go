@@ -5,22 +5,17 @@ import (
 	"github.com/joshjon/go-profiles/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"google.golang.org/grpc/grpclog"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
 )
 
-var log grpclog.LoggerV2
-
-// Fields that require error handling.
 type cfg struct {
 	agent.Config
 	ServerTLSConfig config.TLSConfig
-	//PeerTLSConfig   config.TLSConfig
 }
 
-// Logic and data common to all commands.
 type cli struct {
 	cfg cfg
 }
@@ -60,10 +55,6 @@ func setupFlags(cmd *cobra.Command) error {
 	cmd.Flags().String("server-tls-key-file", "", "Path to server tls key.")
 	cmd.Flags().String("server-tls-ca-file", "", "Path to server certificate authority.")
 
-	//cmd.Flags().String("peer-tls-cert-file", "", "Path to peer tls cert.")
-	//cmd.Flags().String("peer-tls-key-file", "", "Path to peer tls key.")
-	//cmd.Flags().String("peer-tls-ca-file", "", "Path to peer certificate authority.")
-
 	return viper.BindPFlags(cmd.Flags())
 }
 
@@ -77,7 +68,6 @@ func (c *cli) setupConfig(cmd *cobra.Command, args []string) error {
 	viper.SetConfigFile(configFile)
 
 	if err = viper.ReadInConfig(); err != nil {
-		// it's ok if config file doesn't exist
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return err
 		}
@@ -85,14 +75,11 @@ func (c *cli) setupConfig(cmd *cobra.Command, args []string) error {
 
 	c.cfg.NodeName = viper.GetString("node-name")
 	c.cfg.RPCPort = viper.GetInt("rpc-port")
-	c.cfg.ACLModelFile = viper.GetString("acl-mode-file")
+	c.cfg.ACLModelFile = viper.GetString("acl-model-file")
 	c.cfg.ACLPolicyFile = viper.GetString("acl-policy-file")
 	c.cfg.ServerTLSConfig.CertFile = viper.GetString("server-tls-cert-file")
 	c.cfg.ServerTLSConfig.KeyFile = viper.GetString("server-tls-key-file")
 	c.cfg.ServerTLSConfig.CAFile = viper.GetString("server-tls-ca-file")
-	//c.cfg.PeerTLSConfig.CertFile = viper.GetString("peer-tls-cert-file")
-	//c.cfg.PeerTLSConfig.KeyFile = viper.GetString("peer-tls-key-file")
-	//c.cfg.PeerTLSConfig.CAFile = viper.GetString("peer-tls-ca-file")
 
 	if c.cfg.ServerTLSConfig.CertFile != "" &&
 		c.cfg.ServerTLSConfig.KeyFile != "" {
@@ -103,13 +90,6 @@ func (c *cli) setupConfig(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	//if c.cfg.PeerTLSConfig.CertFile != "" && c.cfg.PeerTLSConfig.KeyFile != "" {
-	//	c.cfg.Config.PeerTLSConfig, err = config.SetupTLSConfig(c.cfg.PeerTLSConfig)
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
-
 	return nil
 }
 
@@ -119,6 +99,7 @@ func (c *cli) run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	log.Println("Serving gRPC on", c.cfg.RPCAddr())
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 	<-sigc

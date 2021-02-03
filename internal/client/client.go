@@ -16,7 +16,7 @@ var (
 	serverAddr = flag.String("server_addr", "localhost:8400", "The server address in the format of host:port")
 )
 
-func createRead(client api.ProfileServiceClient) {
+func createProfile(client api.ProfileServiceClient) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	req := &api.ProfileDto{
@@ -50,5 +50,5 @@ func main() {
 
 	defer conn.Close()
 	client := api.NewProfileServiceClient(conn)
-	createRead(client)
+	createProfile(client)
 }

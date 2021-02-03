@@ -24,7 +24,7 @@ func configFile(filename string) string {
 	if dir := os.Getenv("CONFIG_DIR"); dir != "" {
 		return filepath.Join(dir, filename)
 	}
-	return filepath.Join(projectPath(), "certs", filename)
+	return filepath.Join(projectPath(), "test/certs", filename)
 }
 
 func projectPath() string {

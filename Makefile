@@ -1,6 +1,6 @@
 MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 CURRENT_DIR := $(patsubst %/,%,$(dir $(MKFILE_PATH)))
-CONFIG_PATH=${CURRENT_DIR}/certs
+CONFIG_PATH=${CURRENT_DIR}/test/certs
 
 .PHONY: init
 init:
