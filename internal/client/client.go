@@ -19,7 +19,7 @@ var (
 func createRead(client api.ProfileServiceClient) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	req := &api.CreateProfileReq{
+	req := &api.ProfileDto{
 		FirstName: "foo",
 		LastName:  "bar",
 	}

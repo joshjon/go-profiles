@@ -7,10 +7,10 @@ import (
 	fmt "fmt"
 	math "math"
 	proto "github.com/gogo/protobuf/proto"
-	_ "github.com/mwitkow/go-proto-validators"
 	_ "google.golang.org/protobuf/types/known/emptypb"
 	_ "google.golang.org/protobuf/types/known/timestamppb"
 	_ "github.com/gogo/protobuf/gogoproto"
+	_ "github.com/mwitkow/go-proto-validators"
 	time "time"
 	github_com_mwitkow_go_proto_validators "github.com/mwitkow/go-proto-validators"
 )
@@ -34,7 +34,7 @@ func (this *Profile) Validate() error {
 	}
 	return nil
 }
-func (this *CreateProfileReq) Validate() error {
+func (this *ProfileDto) Validate() error {
 	if this.FirstName == "" {
 		return github_com_mwitkow_go_proto_validators.FieldError("FirstName", fmt.Errorf(`must not be empty`))
 	}
@@ -44,6 +44,14 @@ func (this *CreateProfileReq) Validate() error {
 	return nil
 }
 func (this *ReadProfileReq) Validate() error {
+	return nil
+}
+func (this *UpdateProfileReq) Validate() error {
+	if this.Profile != nil {
+		if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(this.Profile); err != nil {
+			return github_com_mwitkow_go_proto_validators.FieldError("Profile", err)
+		}
+	}
 	return nil
 }
 func (this *DeleteProfileRes) Validate() error {

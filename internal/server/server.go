@@ -60,7 +60,7 @@ func NewGRPCServer(config *Config, grpcOpts ...grpc.ServerOption) *grpc.Server {
 	return gsrv
 }
 
-func (server *grpcServer) CreateProfile(ctx context.Context, req *api.CreateProfileReq) (*api.Profile, error) {
+func (server *grpcServer) CreateProfile(ctx context.Context, req *api.ProfileDto) (*api.Profile, error) {
 	if err := server.Authorizer.Authorize(subject(ctx), objectWildcard, createAction); err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (server *grpcServer) ReadProfile(ctx context.Context, req *api.ReadProfileR
 	return nil, api.ErrProfileNotFound{Id: req.GetId()}
 }
 
-func (server *grpcServer) UpdateProfile(ctx context.Context, req *api.CreateProfileReq) (*api.Profile, error) {
+func (server *grpcServer) UpdateProfile(ctx context.Context, req *api.UpdateProfileReq) (*api.Profile, error) {
 	if err := server.Authorizer.Authorize(subject(ctx), objectWildcard, updateAction); err != nil {
 		return nil, err
 	}

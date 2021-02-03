@@ -49,7 +49,7 @@ func (suite *ServerTestSuite) TearDownTest() {
 func (suite *ServerTestSuite) TestCreateReadProfile() {
 	client := suite.rootClient.Client
 	ctx := context.Background()
-	payload := &api.CreateProfileReq{FirstName: "Foo", LastName: "Bar"}
+	payload := &api.ProfileDto{FirstName: "Foo", LastName: "Bar"}
 
 	createResponse, err := client.CreateProfile(ctx, payload)
 	suite.NoError(err)
@@ -73,7 +73,7 @@ func (suite *ServerTestSuite) TestProfileNotFound() {
 func (suite *ServerTestSuite) TestUnauthorized() {
 	client := suite.nobodyClient.Client
 	ctx := context.Background()
-	payload := &api.CreateProfileReq{FirstName: "Foo", LastName: "Bar"}
+	payload := &api.ProfileDto{FirstName: "Foo", LastName: "Bar"}
 
 	createResponse, err := client.CreateProfile(ctx, payload)
 	suite.Nil(createResponse)
