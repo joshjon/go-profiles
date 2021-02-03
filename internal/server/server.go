@@ -39,8 +39,6 @@ type grpcServer struct {
 	profiles []*api.Profile
 }
 
-// Provides users a way to instantiate the service, create a gRPC server, and register the service to that server.
-// This will give the user a server that just needs a listener for it to accept incoming connections.
 func newgrpcServer(config *Config) *grpcServer {
 	return &grpcServer{
 		Config: config,
@@ -48,7 +46,6 @@ func newgrpcServer(config *Config) *grpcServer {
 	}
 }
 
-// Constructor
 func NewGRPCServer(config *Config, grpcOpts ...grpc.ServerOption) *grpc.Server {
 	grpcOpts = append(grpcOpts, grpc.UnaryInterceptor(grpcMiddleware.ChainUnaryServer(
 		grpcAuth.UnaryServerInterceptor(authenticate),
@@ -145,7 +142,6 @@ func authenticate(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
-// Returns the client’s cert’s subject so we can identify a client and check their access.
 func subject(ctx context.Context) string {
 	return ctx.Value(subjectContextKey{}).(string)
 }

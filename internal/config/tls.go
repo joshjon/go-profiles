@@ -15,7 +15,6 @@ type TLSConfig struct {
 	Server        bool
 }
 
-// Allows getting each type of *tls.Config with one function call.
 func SetupTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 	var err error
 	tlsConfig := &tls.Config{}
