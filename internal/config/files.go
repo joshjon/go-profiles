@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 // Paths to generated certs for tests
@@ -23,9 +24,10 @@ func configFile(filename string) string {
 	if dir := os.Getenv("CONFIG_DIR"); dir != "" {
 		return filepath.Join(dir, filename)
 	}
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		panic(err)
-	}
-	return filepath.Join(homeDir, "proglog", filename)
+	return filepath.Join(projectPath(), "certs", filename)
+}
+
+func projectPath() string {
+	_, f, _, _ := runtime.Caller(0)
+	return filepath.Join(filepath.Dir(f), "../..")
 }

@@ -1,4 +1,6 @@
-CONFIG_PATH=${HOME}/proglog/
+MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
+CURRENT_DIR := $(patsubst %/,%,$(dir $(MKFILE_PATH)))
+CONFIG_PATH=${CURRENT_DIR}/certs
 
 .PHONY: init
 init:
