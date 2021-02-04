@@ -1,57 +1,9 @@
 MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 CURRENT_DIR := $(patsubst %/,%,$(dir $(MKFILE_PATH)))
-CONFIG_PATH=${CURRENT_DIR}/test/certs
-
-.PHONY: init
-init:
-	mkdir -p ${CONFIG_PATH}
-
-.PHONY: gencert
-gencert:
-	cfssl gencert \
-		-initca test/ca-csr.json | cfssljson -bare ca
-
-	cfssl gencert \
-		-ca=ca.pem \
-		-ca-key=ca-key.pem \
-		-config=test/ca-config.json \
-		-profile=server \
-		test/server-csr.json | cfssljson -bare server
-
-	cfssl gencert \
-		-ca=ca.pem \
-		-ca-key=ca-key.pem \
-		-config=test/ca-config.json \
-		-profile=client \
-		test/client-csr.json | cfssljson -bare client
-
-	cfssl gencert \
-		-ca=ca.pem \
-		-ca-key=ca-key.pem \
-		-config=test/ca-config.json \
-		-profile=client \
-		-cn="root" \
-		test/client-csr.json | cfssljson -bare root-client
-
-	cfssl gencert \
-		-ca=ca.pem \
-		-ca-key=ca-key.pem \
-		-config=test/ca-config.json \
-		-profile=client \
-		-cn="nobody" \
-		test/client-csr.json | cfssljson -bare nobody-client
-
-	mv *.pem *.csr ${CONFIG_PATH}
-
-$(CONFIG_PATH)/model.conf:
-	cp test/model.conf $(CONFIG_PATH)/model.conf
-
-$(CONFIG_PATH)/policy.csv:
-	cp test/policy.csv $(CONFIG_PATH)/policy.csv
-
-.PHONY: test
-test: $(CONFIG_PATH)/policy.csv $(CONFIG_PATH)/model.conf
-	go test -race ./...
+CONFIG_PATH=$(CURRENT_DIR)/config
+CERT_PATH=$(CURRENT_DIR)/certs
+TEST_CONFIG_PATH=$(CURRENT_DIR)/test
+TEST_CERT_PATH=$(TEST_CONFIG_PATH)/certs
 
 .PHONY: compile
 compile:
@@ -61,6 +13,74 @@ compile:
 		--proto_path=$$(go list -f '{{ .Dir }}' -m github.com/gogo/protobuf) \
 		--proto_path=. \
 		--govalidators_out=gogoimport=true:.
+
+.PHONY: gen-ca-cert
+gen-ca-cert:
+	cfssl gencert -initca $(CONFIG_PATH)/ca-csr.json | cfssljson -bare ca
+	mkdir -p $(CERT_PATH)
+	mv *.pem *.csr $(CERT_PATH)
+
+.PHONY: gen-server-cert
+gen-server-cert:
+	cfssl gencert \
+		-ca=$(CERT_PATH)/ca.pem \
+		-ca-key=$(CERT_PATH)/ca-key.pem \
+		-config=$(CONFIG_PATH)/ca-config.json \
+		-profile=server \
+		$(CONFIG_PATH)/server-csr.json | cfssljson -bare server
+
+	mkdir -p $(CERT_PATH)
+	mv *.pem *.csr $(CERT_PATH)
+
+.PHONY: gen-client-cert
+gen-client-cert:
+	cfssl gencert \
+		-ca=$(CERT_PATH)/ca.pem \
+		-ca-key=$(CERT_PATH)/ca-key.pem \
+		-config=$(CONFIG_PATH)/ca-config.json \
+		-profile=client \
+		-cn="root" \
+		$(CONFIG_PATH)/client-csr.json | cfssljson -bare root-client
+
+	mkdir -p $(CERT_PATH)
+	mv *.pem *.csr $(CERT_PATH)
+
+.PHONY: gen-test-cert
+gen-test-certs:
+	cfssl gencert \
+		-initca $(TEST_CONFIG_PATH)/test-ca-csr.json | cfssljson -bare ca
+
+	cfssl gencert \
+		-ca=ca.pem \
+		-ca-key=ca-key.pem \
+		-config=$(TEST_CONFIG_PATH)/test-ca-config.json \
+		-profile=server \
+		$(TEST_CONFIG_PATH)/test-server-csr.json | cfssljson -bare server
+
+	cfssl gencert \
+		-ca=ca.pem \
+		-ca-key=ca-key.pem \
+		-config=$(TEST_CONFIG_PATH)/test-ca-config.json \
+		-profile=client \
+		-cn="root" \
+		$(TEST_CONFIG_PATH)/test-client-csr.json | cfssljson -bare root-client
+
+	cfssl gencert \
+		-ca=ca.pem \
+		-ca-key=ca-key.pem \
+		-config=$(TEST_CONFIG_PATH)/test-ca-config.json \
+		-profile=client \
+		-cn="nobody" \
+		$(TEST_CONFIG_PATH)/test-client-csr.json | cfssljson -bare nobody-client
+
+	mkdir -p $(TEST_CERT_PATH)
+	mv *.pem *.csr $(TEST_CERT_PATH)
+	cp $(TEST_CONFIG_PATH)/test-model.conf $(TEST_CERT_PATH)/model.conf
+	cp $(TEST_CONFIG_PATH)/test-policy.csv $(TEST_CERT_PATH)/policy.csv
+
+.PHONY: test
+test:
+	go test -race ./...
 
 TAG ?= 0.0.1
 

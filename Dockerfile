@@ -3,7 +3,7 @@ FROM golang:1.15-alpine AS build
 WORKDIR /go/src/proglog
 COPY . .
 
-RUN CGO_ENABLED=0 go build -o /go/bin/proglog ./cmd
+RUN CGO_ENABLED=0 go build -o /go/bin/go-profiles ./cmd
 
 RUN GRPC_HEALTH_PROBE_VERSION=v0.3.2 && \
     wget -qO/go/bin/grpc_health_probe \
@@ -12,7 +12,7 @@ RUN GRPC_HEALTH_PROBE_VERSION=v0.3.2 && \
     chmod +x /go/bin/grpc_health_probe
 
 FROM scratch
-COPY --from=build /go/bin/proglog /bin/proglog
+COPY --from=build /go/bin/go-profiles /bin/proglog
 COPY --from=build /go/bin/grpc_health_probe /bin/grpc_health_probe
 
-ENTRYPOINT ["/bin/proglog"]
+ENTRYPOINT ["/bin/go-profiles"]
