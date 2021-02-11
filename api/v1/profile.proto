@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package profile.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "gogoproto/gogo.proto";
+import "github.com/mwitkow/go-proto-validators/validator.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+
+service ProfileService {
+  rpc CreateProfile(ProfileDto) returns (Profile) {}
+  rpc ReadProfile(ReadProfileReq) returns (Profile) {}
+  rpc UpdateProfile(UpdateProfileReq) returns (Profile) {}
+  rpc DeleteProfile(ReadProfileReq) returns (DeleteProfileRes) {}
+  rpc ListProfiles(google.protobuf.Empty) returns (ListProfilesRes) {}
+}
+
+message Profile {
+  string id = 1;
+  string first_name = 2;
+  string last_name = 3;
+  google.protobuf.Timestamp create_date = 4 [(gogoproto.stdtime) = true];
+  google.protobuf.Timestamp update_date = 5 [(gogoproto.stdtime) = true];
+}
+
+message ProfileDto {
+  string first_name = 1 [(validator.field) = {string_not_empty: true, human_error: "must not be empty"}];
+  string last_name = 2 [(validator.field) = {string_not_empty: true, human_error: "must not be empty"}];
+}
+
+message ReadProfileReq {
+  string id = 1;
+}
+
+message UpdateProfileReq {
+  string id = 1;
+  ProfileDto profile = 2;
+}
+
+message DeleteProfileRes {
+  bool success = 1;
+}
+
+message ListProfilesRes {
+  Profile profile = 1;
+}

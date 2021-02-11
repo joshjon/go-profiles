@@ -1,0 +1,156 @@
+package server
+
+import (
+	"context"
+	grpcMiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpcAuth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
+	grpcValidator "github.com/grpc-ecosystem/go-grpc-middleware/validator"
+	api "github.com/joshjon/go-profiles/api/v1"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/protobuf/types/known/emptypb"
+	"sync"
+	"time"
+
+	"github.com/google/uuid"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
+)
+
+const (
+	objectWildcard = "*"
+	createAction   = "create"
+	readAction     = "read"
+	updateAction   = "update"
+	deleteAction   = "delete"
+)
+
+// Guarantees *grpcServer satisfies api.LogServer interface.
+var _ api.ProfileServiceServer = (*grpcServer)(nil)
+
+type Config struct {
+	Authorizer Authorizer
+}
+
+type grpcServer struct {
+	*Config
+	mu       *sync.RWMutex
+	profiles []*api.Profile
+}
+
+func newgrpcServer(config *Config) *grpcServer {
+	return &grpcServer{
+		Config: config,
+		mu:     &sync.RWMutex{},
+	}
+}
+
+func NewGRPCServer(config *Config, grpcOpts ...grpc.ServerOption) *grpc.Server {
+	grpcOpts = append(grpcOpts, grpc.UnaryInterceptor(
+		grpcMiddleware.ChainUnaryServer(
+			grpcAuth.UnaryServerInterceptor(authenticate),
+			grpcValidator.UnaryServerInterceptor(),
+		),
+	))
+	gsrv := grpc.NewServer(grpcOpts...)
+	hsrv := health.NewServer()
+	hsrv.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	healthpb.RegisterHealthServer(gsrv, hsrv)
+	srv := newgrpcServer(config)
+	api.RegisterProfileServiceServer(gsrv, srv)
+	return gsrv
+}
+
+func (s *grpcServer) CreateProfile(ctx context.Context, req *api.ProfileDto) (*api.Profile, error) {
+	if err := s.Authorizer.Authorize(subject(ctx), objectWildcard, createAction); err != nil {
+		return nil, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	id, err := uuid.NewUUID()
+
+	if err != nil {
+		return nil, status.Error(codes.Internal, "unable to generate UUID")
+	}
+
+	now := time.Now()
+
+	profile := api.Profile{
+		Id:         id.String(),
+		FirstName:  req.FirstName,
+		LastName:   req.LastName,
+		CreateDate: &now,
+		UpdateDate: &now,
+	}
+
+	s.profiles = append(s.profiles, &profile)
+	return &profile, nil
+}
+
+func (s *grpcServer) ReadProfile(ctx context.Context, req *api.ReadProfileReq) (*api.Profile, error) {
+	if err := s.Authorizer.Authorize(subject(ctx), objectWildcard, readAction); err != nil {
+		return nil, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, profile := range s.profiles {
+		if profile.GetId() == req.GetId() {
+			return profile, nil
+		}
+	}
+
+	return nil, api.ErrProfileNotFound{Id: req.GetId()}
+}
+
+func (s *grpcServer) UpdateProfile(ctx context.Context, req *api.UpdateProfileReq) (*api.Profile, error) {
+	if err := s.Authorizer.Authorize(subject(ctx), objectWildcard, updateAction); err != nil {
+		return nil, err
+	}
+	panic("implement me")
+}
+
+func (s *grpcServer) DeleteProfile(ctx context.Context, req *api.ReadProfileReq) (*api.DeleteProfileRes, error) {
+	if err := s.Authorizer.Authorize(subject(ctx), objectWildcard, deleteAction); err != nil {
+		return nil, err
+	}
+	panic("implement me")
+}
+
+func (s *grpcServer) ListProfiles(ctx context.Context, req *emptypb.Empty) (*api.ListProfilesRes, error) {
+	panic("implement me")
+}
+
+type Authorizer interface {
+	Authorize(subject, object, action string) error
+}
+
+// Interceptor that reads the subject out of the client’s cert and writes it to the RPC’s context.
+func authenticate(ctx context.Context) (context.Context, error) {
+	peer, ok := peer.FromContext(ctx)
+
+	if !ok {
+		return ctx, status.New(codes.Unknown, "couldn't find peer info").Err()
+	}
+
+	if peer.AuthInfo == nil {
+		return ctx, status.New(codes.Unauthenticated, "no transport security being used").Err()
+	}
+
+	tlsInfo := peer.AuthInfo.(credentials.TLSInfo)
+	subject := tlsInfo.State.VerifiedChains[0][0].Subject.CommonName
+	ctx = context.WithValue(ctx, subjectContextKey{}, subject)
+	return ctx, nil
+}
+
+func subject(ctx context.Context) string {
+	return ctx.Value(subjectContextKey{}).(string)
+}
+
+type subjectContextKey struct{}

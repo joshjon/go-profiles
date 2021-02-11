@@ -1,0 +1,4 @@
+p, root, *, create
+p, root, *, read
+p, root, *, update
+p, root, *, delete

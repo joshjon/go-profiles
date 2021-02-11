@@ -1,0 +1,5 @@
+server-tls-ca-file: /bin/certs/ca.pem
+server-tls-cert-file: /bin/certs/server.pem
+server-tls-key-file: /bin/certs/server-key.pem
+acl-model-file: /bin/config/model.conf
+acl-policy-file: /bin/config/policy.csv
