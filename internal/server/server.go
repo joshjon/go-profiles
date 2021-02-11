@@ -6,6 +6,8 @@ import (
 	grpcAuth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	grpcValidator "github.com/grpc-ecosystem/go-grpc-middleware/validator"
 	api "github.com/joshjon/go-profiles/api/v1"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"sync"
 	"time"
@@ -47,11 +49,16 @@ func newgrpcServer(config *Config) *grpcServer {
 }
 
 func NewGRPCServer(config *Config, grpcOpts ...grpc.ServerOption) *grpc.Server {
-	grpcOpts = append(grpcOpts, grpc.UnaryInterceptor(grpcMiddleware.ChainUnaryServer(
-		grpcAuth.UnaryServerInterceptor(authenticate),
-		grpcValidator.UnaryServerInterceptor(),
-	)))
+	grpcOpts = append(grpcOpts, grpc.UnaryInterceptor(
+		grpcMiddleware.ChainUnaryServer(
+			grpcAuth.UnaryServerInterceptor(authenticate),
+			grpcValidator.UnaryServerInterceptor(),
+		),
+	))
 	gsrv := grpc.NewServer(grpcOpts...)
+	hsrv := health.NewServer()
+	hsrv.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	healthpb.RegisterHealthServer(gsrv, hsrv)
 	srv := newgrpcServer(config)
 	api.RegisterProfileServiceServer(gsrv, srv)
 	return gsrv

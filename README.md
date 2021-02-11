@@ -2,7 +2,7 @@
 
 A project I created while learning Go ✌️
 
-### Prerequisites
+## Prerequisites
 - [Go](https://golang.org/doc/install)
   
         brew install go
@@ -18,51 +18,57 @@ A project I created while learning Go ✌️
         brew install protobuf
         go get github.com/gogo/protobuf/proto...@v1.3.2
 
-### Makefile
+## Makefile
 
-Compile protobuf
-```shell
-make compile
-```
- 
-Generate test certificates
-```shell
-make gen-test-cert
-```
+### Protobuf
 
-Run tests
-```shell
-make certs
-```
+- Compile protobuf
+  
+      make compile
 
-Generate CA cert
-```shell
-make gen-ca-cert
-```
+### Testing
+- Generate test certificates
+  
+      make gen-test-cert
 
-Generate Server cert
-```shell
-make gen-server-cert
-```
+- Run tests
 
-Generate Client cert
-```shell
-make gen-client-cert
-```
+      make certs
 
-### Running the service
-```shell
-go run cmd/main.go --config-file args.yaml
-```
+### Certificates
 
-### Build and run a binary
-`CGO_ENABLED=0` in order to statically compile the binary as opposed to dynamically linked.
-```shell
-CGO_ENABLED=0 go build -o ./build/go-profiles ./cmd
-./build/go-profiles --config-file args.yaml
-```
+- Generate CA cert
+  
+      make gen-ca-cert
 
-### Consuming
+- Generate server cert
+  
+      make gen-server-cert
+
+- Generate client cert
+
+      make gen-client-cert
+
+### Binary
+
+- Build and run binary
+
+      make build
+      make run
+
+### Docker
+
+- Build and run using Docker
+
+      make build-docker
+      make run-docker
+      make stop-docker
+
+## Consuming
+
+For testing purposes use an RPC client such as BloomRPC. Import `/api/v1/profile.proto` and make requests to 
+localhost:8400 using TLS configured with the generated certs from your generated CA and client certs.
+
 We have both a client and server in the same code base so for this example we do not need to re-generate the code from
 proto files. However, in real world usage, the proto file must be shared with the client, which will then generate its
 code files in the programming language of its choice.

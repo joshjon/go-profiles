@@ -82,7 +82,32 @@ gen-test-certs:
 test:
 	go test -race ./...
 
-TAG ?= 0.0.1
+.PHONY: build
+build:
+	# CGO_ENABLED=0 in order to statically compile the binary as opposed to dynamically linked.
+	CGO_ENABLED=0 go build -o ./build/go-profiles ./cmd
 
+.PHONY: run
+run:
+	./build/go-profiles --server-tls-ca-file ./certs/ca.pem  \
+						--server-tls-cert-file ./certs/server.pem \
+						--server-tls-key-file ./certs/server-key.pem \
+						--acl-model-file ./config/model.conf \
+						--acl-policy-file ./config/policy.csv
+
+TAG ?= 0.0.1
+REPO = github.com/joshjon/go-profiles
+CONTAINER = go-profiles
+
+.PHONY: build-docker
 build-docker:
-	docker build -t github.com/joshjon/go-profiles:$(TAG) .
+	docker build -t $(REPO):$(TAG) .
+
+.PHONY: run-docker
+run-docker:
+	docker run -p 8400:8400 -d --name $(CONTAINER) $(REPO):$(TAG)
+	@echo Serving gRPC on localhost:8400
+
+.PHONY: stop-docker
+stop-docker:
+	docker stop $(CONTAINER) | xargs docker rm
