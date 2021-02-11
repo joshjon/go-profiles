@@ -1,6 +1,8 @@
 {
     "CN": "client",
-    "hosts": [""],
+    "hosts": [
+        ""
+    ],
     "key": {
         "algo": "rsa",
         "size": 2048

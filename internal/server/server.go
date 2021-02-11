@@ -64,13 +64,13 @@ func NewGRPCServer(config *Config, grpcOpts ...grpc.ServerOption) *grpc.Server {
 	return gsrv
 }
 
-func (server *grpcServer) CreateProfile(ctx context.Context, req *api.ProfileDto) (*api.Profile, error) {
-	if err := server.Authorizer.Authorize(subject(ctx), objectWildcard, createAction); err != nil {
+func (s *grpcServer) CreateProfile(ctx context.Context, req *api.ProfileDto) (*api.Profile, error) {
+	if err := s.Authorizer.Authorize(subject(ctx), objectWildcard, createAction); err != nil {
 		return nil, err
 	}
 
-	server.mu.Lock()
-	defer server.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	id, err := uuid.NewUUID()
 
@@ -88,19 +88,19 @@ func (server *grpcServer) CreateProfile(ctx context.Context, req *api.ProfileDto
 		UpdateDate: &now,
 	}
 
-	server.profiles = append(server.profiles, &profile)
+	s.profiles = append(s.profiles, &profile)
 	return &profile, nil
 }
 
-func (server *grpcServer) ReadProfile(ctx context.Context, req *api.ReadProfileReq) (*api.Profile, error) {
-	if err := server.Authorizer.Authorize(subject(ctx), objectWildcard, readAction); err != nil {
+func (s *grpcServer) ReadProfile(ctx context.Context, req *api.ReadProfileReq) (*api.Profile, error) {
+	if err := s.Authorizer.Authorize(subject(ctx), objectWildcard, readAction); err != nil {
 		return nil, err
 	}
 
-	server.mu.Lock()
-	defer server.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	for _, profile := range server.profiles {
+	for _, profile := range s.profiles {
 		if profile.GetId() == req.GetId() {
 			return profile, nil
 		}
@@ -109,21 +109,21 @@ func (server *grpcServer) ReadProfile(ctx context.Context, req *api.ReadProfileR
 	return nil, api.ErrProfileNotFound{Id: req.GetId()}
 }
 
-func (server *grpcServer) UpdateProfile(ctx context.Context, req *api.UpdateProfileReq) (*api.Profile, error) {
-	if err := server.Authorizer.Authorize(subject(ctx), objectWildcard, updateAction); err != nil {
+func (s *grpcServer) UpdateProfile(ctx context.Context, req *api.UpdateProfileReq) (*api.Profile, error) {
+	if err := s.Authorizer.Authorize(subject(ctx), objectWildcard, updateAction); err != nil {
 		return nil, err
 	}
 	panic("implement me")
 }
 
-func (server *grpcServer) DeleteProfile(ctx context.Context, req *api.ReadProfileReq) (*api.DeleteProfileRes, error) {
-	if err := server.Authorizer.Authorize(subject(ctx), objectWildcard, deleteAction); err != nil {
+func (s *grpcServer) DeleteProfile(ctx context.Context, req *api.ReadProfileReq) (*api.DeleteProfileRes, error) {
+	if err := s.Authorizer.Authorize(subject(ctx), objectWildcard, deleteAction); err != nil {
 		return nil, err
 	}
 	panic("implement me")
 }
 
-func (server *grpcServer) ListProfiles(ctx context.Context, req *emptypb.Empty) (*api.ListProfilesRes, error) {
+func (s *grpcServer) ListProfiles(ctx context.Context, req *emptypb.Empty) (*api.ListProfilesRes, error) {
 	panic("implement me")
 }
 

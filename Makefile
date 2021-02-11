@@ -85,7 +85,7 @@ test:
 .PHONY: build
 build:
 	# CGO_ENABLED=0 in order to statically compile the binary as opposed to dynamically linked.
-	CGO_ENABLED=0 go build -o ./build/go-profiles ./cmd
+	CGO_ENABLED=0 go build -o ./build/go-profiles ./cmd/go-profiles
 
 .PHONY: run
 run:
@@ -94,6 +94,10 @@ run:
 						--server-tls-key-file ./certs/server-key.pem \
 						--acl-model-file ./config/model.conf \
 						--acl-policy-file ./config/policy.csv
+
+.PHONY: run-client
+run-client:
+	go run cmd/client/main.go
 
 TAG ?= 0.0.1
 REPO = github.com/joshjon/go-profiles
