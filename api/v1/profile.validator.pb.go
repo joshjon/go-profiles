@@ -21,6 +21,9 @@ var _ = fmt.Errorf
 var _ = math.Inf
 var _ = time.Kitchen
 
+func (this *ListOfString) Validate() error {
+	return nil
+}
 func (this *Profile) Validate() error {
 	if this.CreateDate != nil {
 		if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(this.CreateDate); err != nil {
