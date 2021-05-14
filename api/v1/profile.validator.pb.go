@@ -32,6 +32,7 @@ func (this *Profile) Validate() error {
 			return github_com_mwitkow_go_proto_validators.FieldError("UpdateDate", err)
 		}
 	}
+	// Validation of proto3 map<> fields is unsupported.
 	return nil
 }
 func (this *ProfileDto) Validate() error {

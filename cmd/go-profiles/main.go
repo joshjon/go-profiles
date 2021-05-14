@@ -99,7 +99,7 @@ func (c *cli) run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	log.Println("Serving gRPC on", c.cfg.RPCAddr())
+	log.Println("Serving gRPC on ", c.cfg.RPCAddr())
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 	<-sigc
